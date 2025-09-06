@@ -77,68 +77,15 @@ pub struct BurnTokenCtx<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(beneficiary: Pubkey)]
-pub struct CreateEscrow<'info> {
+pub struct RedeemGold<'info> {
     #[account(mut)]
-    pub depositor: Signer<'info>,
+    pub user: Signer<'info>,
     #[account(mut)]
-    pub depositor_token_account: Account<'info, TokenAccount>,
-    #[account(
-        init,
-        payer = depositor,
-        space = 8 + 32 + 32 + 8 + 1 + 1,
-        seeds = [b"escrow", depositor.key().as_ref(), beneficiary.as_ref()],
-        bump
-    )]
-    pub escrow_account: Account<'info, EscrowAccount>,
     pub mint: Account<'info, Mint>,
-    #[account(
-        init,
-        payer = depositor,
-        token::mint = mint,
-        token::authority = escrow_account,
-        seeds = [b"vault", depositor.key().as_ref(), beneficiary.as_ref()],
-        bump
-    )]
-    pub vault_token_account: Account<'info, TokenAccount>,
-    pub token_program: Program<'info, Token>,
-    pub system_program: Program<'info, System>,
-    pub rent: Sysvar<'info, Rent>,
-}
-
-#[derive(Accounts)]
-pub struct ReleaseEscrow<'info> {
     #[account(mut)]
-    pub depositor: Signer<'info>,
-    #[account(
-        mut,
-        seeds = [b"escrow", escrow_account.depositor.as_ref(), escrow_account.beneficiary.as_ref()],
-        bump = escrow_account.bump,
-        has_one = depositor,
-    )]
-    pub escrow_account: Account<'info, EscrowAccount>,
-    #[account(mut, seeds = [b"vault", escrow_account.depositor.as_ref(), escrow_account.beneficiary.as_ref()], bump)]
-    pub vault_token_account: Account<'info, TokenAccount>,
-    #[account(mut)]
-    pub beneficiary_token_account: Account<'info, TokenAccount>,
-    pub token_program: Program<'info, Token>,
-}
-
-#[derive(Accounts)]
-pub struct CancelEscrow<'info> {
-    #[account(mut)]
-    pub depositor: Signer<'info>,
-    #[account(
-        mut,
-        seeds = [b"escrow", escrow_account.depositor.as_ref(), escrow_account.beneficiary.as_ref()],
-        bump = escrow_account.bump,
-        has_one = depositor,
-    )]
-    pub escrow_account: Account<'info, EscrowAccount>,
-    #[account(mut, seeds = [b"vault", escrow_account.depositor.as_ref(), escrow_account.beneficiary.as_ref()], bump)]
-    pub vault_token_account: Account<'info, TokenAccount>,
-    #[account(mut)]
-    pub depositor_token_account: Account<'info, TokenAccount>,
+    pub user_token_account: Account<'info, TokenAccount>,
+    #[account(mut, seeds = [b"global-state"], bump)]
+    pub global_state: Account<'info, GlobalState>,
     pub token_program: Program<'info, Token>,
 }
 

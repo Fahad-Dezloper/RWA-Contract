@@ -24,7 +24,6 @@ pub mod rwa_contract {
         state.admin = ctx.accounts.admin.key();
         state.max_supply = max_supply;
         state.total_supply = 0;
-        state.paused = false;
         Ok(())
     }
 
@@ -116,116 +115,31 @@ pub mod rwa_contract {
         Ok(())
     }
 
-    pub fn create_escrow(
-        ctx: Context<CreateEscrow>,
-        beneficiary: Pubkey,
-        amount: u64,
-    ) -> Result<()> {
-        let escrow = &mut ctx.accounts.escrow_account;
-        escrow.depositor = ctx.accounts.depositor.key();
-        escrow.beneficiary = beneficiary;
-        escrow.amount = amount;
-        escrow.state = EscrowState::Active;
-        escrow.bump = ctx.bumps.escrow_account;
-
-        token::transfer(
+    pub fn redeem_gold(ctx: Context<RedeemGold>, amount: u64) -> Result<()> {
+        // Burn the tokens
+        token::burn(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.depositor_token_account.to_account_info(),
-                    to: ctx.accounts.vault_token_account.to_account_info(),
-                    authority: ctx.accounts.depositor.to_account_info(),
+                Burn {
+                    mint: ctx.accounts.mint.to_account_info(),
+                    from: ctx.accounts.user_token_account.to_account_info(),
+                    authority: ctx.accounts.user.to_account_info(),
                 },
             ),
             amount,
         )?;
 
-        emit!(EscrowCreatedEvent {
-            depositor: escrow.depositor,
-            beneficiary,
+        // Update total supply
+        let state = &mut ctx.accounts.global_state;
+        state.total_supply = state
+            .total_supply
+            .checked_sub(amount)
+            .ok_or(CustomError::MathOverflow)?;
+
+        emit!(RedeemEvent {
+            user: ctx.accounts.user.key(),
             amount,
-        });
-
-        Ok(())
-    }
-
-    pub fn release_escrow(ctx: Context<ReleaseEscrow>) -> Result<()> {
-        {
-            let escrow_check = &ctx.accounts.escrow_account;
-            require!(escrow_check.state == EscrowState::Active, CustomError::EscrowNotActive);
-        }
-
-        let escrow_info = ctx.accounts.escrow_account.to_account_info();
-        let escrow = &mut ctx.accounts.escrow_account;
-
-        let seeds: &[&[u8]] = &[
-            b"escrow",
-            escrow.depositor.as_ref(),
-            escrow.beneficiary.as_ref(),
-            &[escrow.bump],
-        ];
-        let signer_seeds = &[&seeds[..]];
-
-        token::transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.vault_token_account.to_account_info(),
-                    to: ctx.accounts.beneficiary_token_account.to_account_info(),
-                    authority: escrow_info,
-                },
-                signer_seeds,
-            ),
-            escrow.amount,
-        )?;
-
-        escrow.state = EscrowState::Released;
-
-        emit!(EscrowReleasedEvent {
-            depositor: escrow.depositor,
-            beneficiary: escrow.beneficiary,
-            amount: escrow.amount,
-        });
-
-        Ok(())
-    }
-
-    pub fn cancel_escrow(ctx: Context<CancelEscrow>) -> Result<()> {
-        {
-            let escrow_check = &ctx.accounts.escrow_account;
-            require!(escrow_check.state == EscrowState::Active, CustomError::EscrowNotActive);
-        }
-
-        let escrow_info = ctx.accounts.escrow_account.to_account_info();
-        let escrow = &mut ctx.accounts.escrow_account;
-
-        let seeds: &[&[u8]] = &[
-            b"escrow",
-            escrow.depositor.as_ref(),
-            escrow.beneficiary.as_ref(),
-            &[escrow.bump],
-        ];
-        let signer_seeds = &[&seeds[..]];
-
-        token::transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.vault_token_account.to_account_info(),
-                    to: ctx.accounts.depositor_token_account.to_account_info(),
-                    authority: escrow_info,
-                },
-                signer_seeds,
-            ),
-            escrow.amount,
-        )?;
-
-        escrow.state = EscrowState::Cancelled;
-
-        emit!(EscrowCancelledEvent {
-            depositor: escrow.depositor,
-            beneficiary: escrow.beneficiary,
-            amount: escrow.amount,
+            timestamp: Clock::get()?.unix_timestamp,
         });
 
         Ok(())

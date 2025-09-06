@@ -8,14 +8,6 @@ pub struct GlobalState {
     pub paused: bool,
 }
 
-#[account]
-pub struct EscrowAccount {
-    pub depositor: Pubkey,
-    pub beneficiary: Pubkey,
-    pub amount: u64,
-    pub state: EscrowState,
-    pub bump: u8,
-}
 
 #[error_code]
 pub enum CustomError {
@@ -25,8 +17,6 @@ pub enum CustomError {
     SupplyExceeded,
     #[msg("Token transfers are currently paused")]
     TransfersPaused,
-    #[msg("Escrow is not active.")]
-    EscrowNotActive,
     #[msg("Math overflow")]
     MathOverflow,
 }
@@ -47,31 +37,10 @@ pub struct TransferEvent {
 }
 
 #[event]
-pub struct EscrowCreatedEvent {
-    pub depositor: Pubkey,
-    pub beneficiary: Pubkey,
+pub struct RedeemEvent {
+    pub user: Pubkey,
     pub amount: u64,
-}
-
-#[event]
-pub struct EscrowReleasedEvent {
-    pub depositor: Pubkey,
-    pub beneficiary: Pubkey,
-    pub amount: u64,
-}
-
-#[event]
-pub struct EscrowCancelledEvent {
-    pub depositor: Pubkey,
-    pub beneficiary: Pubkey,
-    pub amount: u64,
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
-pub enum EscrowState {
-    Active,
-    Released,
-    Cancelled,
+    pub timestamp: i64,
 }
 
 
